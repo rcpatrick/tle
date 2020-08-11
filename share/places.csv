@@ -1,0 +1,8 @@
+name,fullname,latitude,longitude,elevation,azleft,azright,elmin,elmax,rangemin,rangemax
+cod,Cape Cod Air Force Station (Massachusetts USA),41.754785,070.539151,0.060966,347,227,3,85,200,5556
+ble,Beale Air Force Base (California USA),39.136063,-121.351237,0.1120,126,006,3,85,200,5556
+clr,Clear Air Force Station (Alaska USA),64.290556,-149.186944,0.1750,184,064,3,85,200,5556
+egl,Eglin Air Force Base (Florida USA),30.572411,-86.214836,0.0390,120,240,3,105,200,200000
+fyl,RAF Fylingdales (North Yorkshire England),54.361758,-0.670051,0.2600,0,360,3,85,200,5556
+cav,Cavalier Air Force Station (North Dakota USA),48.724567,-97.899755,0.3520,298,078,1.9,95,200,3300
+thl,Thule Air Base (Greenland),76.570322,-68.299211,0.3920,297,177,3,85,200,5556

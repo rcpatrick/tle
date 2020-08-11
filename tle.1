@@ -1,0 +1,57 @@
+.TH TLE 1
+.SH NAME
+tle \- NORAD two-line element set processor
+.SH SYNOPSIS
+.PP
+.B tle COMMAND [ARGUMENT]
+.SH DESCRIPTION
+.PP
+.B tle
+is a tool for handling NORAD two-line element sets (TLEs). It can retrieve
+the TLE for any satellite specified by NORAD SATNO or international designator. It can also print human-readable elements and compute the epoch time and age of any TLE.
+.SH COMMANDS
+.TP
+.B sat [ID]
+Return the TLE of the satellite specified by ID, which can be a SATNO (5-digit NORAD catalog ID #, e.g. 25544 for the International Space Station)
+or INTDES (International Designator of the form YYNNNA... e.g. 98067A for the ISS).
+.TP
+.B decode [ID]
+Print a more human-readable list of orbital elements.
+.TP
+.B epochtime [ID]
+Print the epoch time of the given TLE in YYYY DDD HH:MM:SS.MMM format.
+.TP
+.B age [ID]
+Print the age of the TLE (time elapsed since epoch.)
+.TP
+.B places [PLACE | edit]
+If PLACE is a place code found in share/places.csv, print information about the
+place. If the argument 'edit' is passed, opens places.csv in $EDITOR.
+.TP
+.B cron
+Set up and manage cron jobs for automatically downloading new TLE files.
+(Coming soon)
+.TP
+.B looks [ID]
+Calculate look angles for a specific satellite. (Coming soon)
+.SH EXAMPLES
+.TP
+.B tle sat 25544
+Will print the two-line element set for the International Space Station to stdout.
+.TP
+.B tle decode 25544
+Will print a human-readable list of the ISS's orbital elements.
+.TP
+.B tle decode 25544 | grep \(dqInclination\(rs|Period\(dq
+Because it is run in the shell, this program is very extensible. You can use your built-in Unix-like utils to filter the output of
+.B tle.
+This example will print only the inclination and period of the ISS. You could write a wrapper script to accept a SATNO or INTDES and return
+only those elements that you care about.
+.TP
+.B tle places fyl
+Will print information about the RAF Fylingdales radar station: one of the pre-set places for computing look angles in share/places.csv.
+.SH AUTHOR
+Written by Ray Patrick <ray@raypatrick.xyz> in 2020.
+.SH LICENSE
+GPLv3
+.SH SEE ALSO

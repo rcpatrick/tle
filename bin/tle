@@ -1,0 +1,307 @@
+#!/bin/bash
+# Constants
+re=6371
+mu=398600.5
+pi=$(echo "scale=10; 4*a(1)" | bc -l) 
+# Regexes
+satnore="^[1-9]{1}[0-9]{4}$"                # Regex for 5-digit SATNO
+paddedsatnore="^[0| ]{1}[0-9| ]{3}[1-9]$"   # Regex for padded satno
+shortintdesre="^[0-9]{5}[A-Za-z]+$"         # Regex for short int-des (98067A, 98067ABCD)
+
+# Math functions
+function cuberoot
+{
+  echo "e(l($1)/3)" | bc -l
+}
+function settlefile
+{
+  #workingdir=$(pwd)
+  #tlefile=$workingdir/tle
+  tlefile=/usr/local/share/tle/tle
+}
+
+function readplaces
+{
+  placefile=/usr/local/share/tle/places.csv
+}
+
+function getplace
+{
+  placeline=$(sed -n "/^$1/p" $placefile)
+  name=$(echo $placeline | cut -f1 -d",")
+  fullname=$(echo $placeline | cut -f2 -d",")
+  lat=$(echo $placeline | cut -f3 -d",")
+  lon=$(echo $placeline | cut -f4 -d",")
+  elevation=$(echo $placeline | cut -f5 -d",")
+  azleft=$(echo $placeline | cut -f6 -d",")
+  azright=$(echo $placeline | cut -f7 -d",")
+  elmin=$(echo $placeline | cut -f8 -d",")
+  elmax=$(echo $placeline | cut -f9 -d",")
+  rangemin=$(echo $placeline | cut -f10 -d",")
+  rangemax=$(echo $placeline | cut -f11 -d",")
+}
+
+function showplace
+{
+  echo "Place: $fullname"
+  echo "Latitude: $lat"
+  echo "Longitude: $lon"
+  echo "Elevation (km): $elevation"
+  echo "Left-hand azimuth extent (deg): $azleft"
+  echo "Right-hand azimuth extent (deg): $azright"
+  echo "Minimum elevation angle (deg): $elmin"
+  echo "Maximum elevation angle (deg): $elmax"
+  echo "Minimum range (km): $rangemin"
+  echo "Maximum range (km): $rangemax"
+}
+
+function padtime
+{
+  read input
+  if [ ${#input} -eq 1 ]; then
+	  echo 0$input
+  elif [ ${#input} -gt 1 ]; then
+	  echo $input 
+  else 
+	  echo "0"
+  fi
+}
+
+function getseconds
+{
+  echo "(86400*$1)+(3600*$2)+(60*$3)+$4" | bc -l
+}
+
+function getage
+{
+  days=$(echo "$1/86400" | bc -l)
+  dayfraction=0.$(echo $days | cut -f2 -d".")
+  hours=$(echo "(86400/3600)*$dayfraction" | bc -l)
+  hourfraction=0.$(echo $hours | cut -f2 -d".")
+  minutes=$(echo "3600*$hourfraction/60" | bc -l)
+  minutesfraction=0.$(echo $minutes | cut -f2 -d".")
+  seconds=$(echo "60*$minutesfraction" | bc -l)
+  days=$(echo $days | cut -f1 -d".")
+  days=$(echo $(echo $days | cut -f1 -d".") | padtime)d
+  hours=$(echo $(echo $hours | cut -f1 -d".") | padtime)h
+  minutes=$(echo $(echo $minutes | cut -f1 -d".") | padtime)m
+  seconds=$(echo $(echo $seconds | cut -f1 -d".") | padtime)s
+  echo "$days $hours $minutes $seconds"
+}
+
+function epochtime 
+{
+  # date +%Y-%j-%H-%M-%S
+  tle=$(getsatno $1 $2)
+  epochyear=${tle:18:2}
+  if [ $epochyear -le 57 ]; then
+	  epochyear="20$epochyear"
+  elif [ $epochyear -gt 57 ]; then
+	  epochyear="19$epochyear"
+  fi
+  epochday=${tle:20:12}
+  jday=${epochday:0:3}
+  jdayfraction=0.${epochday:4}
+  hours=$(echo "$jdayfraction*24" | bc -l)
+  hoursfraction=0.$(echo $hours | cut -f2 -d".")
+  minutes=$(echo "$hoursfraction*60" | bc -l)
+  minutesfraction=0.$(echo $minutes | cut -f2 -d".")
+  seconds=$(echo "scale=3; ($minutesfraction*60)/1" | bc -l)
+  secondsfraction=$(echo $seconds | cut -f2 -d".")
+  seconds=$(echo $(echo $seconds | cut -f1 -d".") | padtime)
+  seconds=$(echo $seconds.$secondsfraction)
+  hours=$(echo $(echo $hours | cut -f1 -d".") | padtime)
+  minutes=$(echo $(echo $minutes | cut -f1 -d".") | padtime)
+  echo "$epochyear $jday $hours:$minutes:$seconds UTC"
+}
+
+function age
+{
+  read inputtime
+  epochyear=$(echo $inputtime | cut -f1 -d" ")
+  epochday=$(echo $inputtime | cut -f2 -d" ") 
+  hours=$(echo $inputtime | cut -f1 -d":")
+  hours=$(echo $hours | cut -f3 -d" ")
+  minutes=$(echo $inputtime | cut -f2 -d":")
+  seconds=$(echo $inputtime | cut -f3 -d":")
+  seconds=$(echo $seconds | cut -f1 -d".")
+  now=$(date -u +%s)
+  then=$(getseconds $(echo "$epochday-1" | bc) $hours $minutes $seconds)
+  datecmd="date --date=$epochyear-01-01 -u +%s"
+  then1970=`$datecmd`
+  then=$(echo "$then+$then1970" | bc)
+  diff=$(echo "$now-$then" | bc)
+  elsetage=$(getage $diff)
+  echo $elsetage
+}
+
+function gettle
+{
+  sed -n "/^[12] $1/p" $2
+}
+
+function getsatno
+{
+  [[ $1 =~ $satnore ]] && gettle $1 $2 && exit 0
+  [[ $1 =~ $paddedsatnore ]] && correctedsatno=$(echo "$1" | sed "s/^0/ /;: loop s/ 0/  /;t loop") && sed -n "/^[12] $correctedsatno/p" $2 && exit 0
+  [[ $1 =~ $shortintdesre ]] && line1=$(sed -n "/^1.\{8\}$1/p" $2) && gettle "${line1:2:5}" $2 && exit 0
+}
+
+function printsatno
+{
+  [[ $1 =~ $satnore ]] && echo $1 && exit 0
+  [[ $1 =~ $shortintdesre ]] && line1=$(sed -n "/^1.\{8\}$1/p" $2)
+  echo ${line1:2:5}
+}
+
+
+function decodetle
+{
+  read line1
+  read line2
+  # Line 1
+  satno=${line1:2:5}
+  classification=${line1:7:1}
+  if [ $classification == "U" ]; then
+	 classification="UNCLASSIFIED"
+  fi
+  if [ $classification == "S" ]; then
+	  classification="SECRET"
+  fi
+  intdes=${line1:9:7}
+  epochyear=${line1:18:2}
+  epochday=${line1:20:12}
+  mmprime=${line1:33:11}
+  mmdoubleprime=${line1:44:9}
+  dragterm=${line1:53:9}
+  ephtype=${line1:62:1}
+  elsetnumber=${line1:65:3}
+  checksum1=${line1:68:1}
+  
+  # Line 2
+  inclination=${line2:8:8}
+  raan=${line2:17:8}
+  eccentricity=0.${line2:26:7}
+  argofperigee=${line2:34:8}
+  meananomaly=${line2:43:8}
+  meanmotion=${line2:52:11}
+  period=$(echo "scale=2; 1440/$meanmotion" | bc -l)
+  revnumber=${line2:63:5}
+  checksum2=${line2:68:1}
+
+  # Other
+  T=$(echo "scale=2; $period * 60" | bc -l)
+  a=$(cuberoot $(echo "($mu * $T^2)/(4*$pi^2)" | bc -l))
+  apogee=$(echo "scale=2; $a*(1+$eccentricity)/1" | bc -l)
+  apogeealt=$(echo "$apogee - $re" | bc -l)
+  perigee=$(echo "scale=2; $a*(1-$eccentricity)/1" | bc -l)
+  perigeealt=$(echo "$perigee - $re" | bc -l)
+
+  # Print results
+  echo "SATNO: $satno"
+  echo "Classification: $classification"
+  echo "International designator: $intdes"
+  echo "Epoch year: $epochyear"
+  echo "Epoch day: $epochday"
+  echo "First derivative of mean motion: $mmprime"
+  echo "Second derivative of mean motion: $mmdoubleprime"
+  echo "Drag term: $dragterm"
+  echo "Ephemeris type: $ephtype"
+  echo "ELSET number: $elsetnumber"
+  echo "Line 1 checksum: $checksum1"
+  echo "Inclination: $inclination"
+  echo "RAAN: $raan"
+  echo "Eccentricity: $eccentricity"
+  echo "Argument of perigee: $argofperigee"
+  echo "Mean anomaly: $meananomaly"
+  echo "Mean motion: $meanmotion"
+  echo "Period: $period minutes"
+  echo "Rev number: $revnumber"
+  echo "Line 2 checksum: $checksum2"
+  echo "Apogee: $apogee km"
+  echo "Perigee: $perigee km"
+  echo "Apogee altitude: $apogeealt km"
+  echo "Perigee altitude: $perigeealt km"
+  exit 1
+}
+
+#while getopts 'ht' flag
+#do
+#  case "${flag}" in
+#    h) settlefile
+#       getsatno $2 $tlefile | decodetle
+#       ;;
+#  esac
+#done
+
+#if [ $# -eq 1 ]; then
+#	settlefile
+#	getsatno $1 $tlefile
+#fi
+
+case "$1" in
+	sat) settlefile
+	     getsatno $2 $tlefile ;;
+ cron) echo "Set cron job y/n?" ;;
+decode) if [ -z "$2" ]; then echo "tle - not enough arguments."; exit 1; fi
+       settlefile
+	     getsatno $2 $tlefile | decodetle ;;
+looks) settlefile
+	     satno=$(printsatno $2 $tlefile)
+	     echo "Generating looks for "$satno"." ;;
+ epochtime) settlefile
+      epochtime $2 $tlefile ;;
+	age) settlefile
+	     epochtime $2 $tlefile | age ;;
+places) readplaces
+        if [ "$2" = "edit" ]; then
+          sudo $EDITOR $placefile 
+          echo "If you updated places.csv, running 'sudo make install'"
+          echo "from the tle repo directory will overwrite your changes!"
+          echo "Ensure you copy the file on your system to share/places.csv"
+          echo "in the tle repo directory if you don't want this to happen."
+        exit 0
+        fi
+        if [ -z "$2" ]; then
+          echo "tle - not enough arguments."
+          exit 1
+        fi
+        getplace $2
+        showplace ;;
+	  *) cat << EOF
+tle - NORAD two-line element set processor. Written 2020 by Ray Patrick.
+
+Options:
+	$ tle sat [SATNO or INTDES]
+		Return the TLE of the satellite specified by SATNO.
+		Also accepts international designators of the form
+		98067A.
+
+        $ tle decode [SATNO or INTDES]
+                Print a more human-readable list of orbital elements.
+
+        $ tle epochtime [SATNO or INTDES]
+                Print the epoch time of the given TLE in 
+                YYYY DDD HH:MM:SS.MMM format.
+
+        $ tle age [SATNO or INTDES]
+                Print the age of the TLE (time elapsed since epoch).
+
+        $ tle places [PLACE or 'edit']
+                If PLACE is a place code found in share/places.csv,
+                print information about the place. If the argument
+                'edit' is passed, opens places.csv in \$EDITOR.
+
+        $ tle cron
+      		Set up and manage cron jobs for automatically
+       		downloading new TLE files. (Coming soon)
+
+  	$ tle looks [SATNO or INTDES] [PLACE]
+       		Calculate look angles for a specific satellite.
+                (Coming soon)
+
+NOTE: Typing "man tle" at the command line will bring up more
+thorough instructions.	
+EOF
+esac
+           
