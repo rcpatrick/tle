@@ -3,7 +3,7 @@
 tle \- NORAD two-line element set processor
 .SH SYNOPSIS
 .PP
-.B tle COMMAND [ARGUMENT]
+.B tle COMMAND [ARGUMENT(S)]
 .SH DESCRIPTION
 .PP
 .B tle
@@ -11,29 +11,33 @@ is a tool for handling NORAD two-line element sets (TLEs). It can retrieve
 the TLE for any satellite specified by NORAD SATNO or international designator. It can also print human-readable elements and compute the epoch time and age of any TLE.
 .SH COMMANDS
 .TP
-.B sat [ID]
+.B tle sat [ID]
 Return the TLE of the satellite specified by ID, which can be a SATNO (5-digit NORAD catalog ID #, e.g. 25544 for the International Space Station)
-or INTDES (International Designator of the form YYNNNA... e.g. 98067A for the ISS).
+or INTDES (International Designator of the form YYNNNA... e.g. 98067A for the ISS). SATNOs with fewer than 5 significant digits must be padded with
+zeros, e.g. 00005.
 .TP
-.B decode [ID]
+.B tle decode [ID]
 Print a more human-readable list of orbital elements.
 .TP
-.B epochtime [ID]
+.B tle epochtime [ID]
 Print the epoch time of the given TLE in YYYY DDD HH:MM:SS.MMM format.
 .TP
-.B age [ID]
+.B tle age [ID]
 Print the age of the TLE (time elapsed since epoch.)
 .TP
-.B places [PLACE | edit]
+.B tle places [PLACE | edit]
 If PLACE is a place code found in share/places.csv, print information about the
 place. If the argument 'edit' is passed, opens places.csv in $EDITOR.
 .TP
-.B cron
+.B tle cron
 Set up and manage cron jobs for automatically downloading new TLE files.
 (Coming soon)
 .TP
-.B looks [ID]
+.B tle looks [ID]
 Calculate look angles for a specific satellite. (Coming soon)
+.TP
+.B tle update
+Queries space-track.org to update your local copy of the spacetrack catalog, found at /usr/local/share/tle/tle. Will prompt you for your space-track.org username and password.
 .SH EXAMPLES
 .TP
 .B tle sat 25544
@@ -42,11 +46,14 @@ Will print the two-line element set for the International Space Station to stdou
 .B tle decode 25544
 Will print a human-readable list of the ISS's orbital elements.
 .TP
-.B tle decode 25544 | grep \(dqInclination\(rs|Period\(dq
-Because it is run in the shell, this program is very extensible. You can use your built-in Unix-like utils to filter the output of
-.B tle.
-This example will print only the inclination and period of the ISS. You could write a wrapper script to accept a SATNO or INTDES and return
-only those elements that you care about.
+.B grep \(dqInclination\(rs|Period\(dq <<< `tle decode 25544`
+Since the inputs and outputs of
+.B tle
+are simply text streams, you can filter them with your built-in utilities such as
+.B grep, awk, sort,
+etc. This example will show the inclination and period of the ISS. You can write a wrapper script to filter output from
+.B tle
+in this way for any criteria you may need. 
 .TP
 .B tle places fyl
 Will print information about the RAF Fylingdales radar station: one of the pre-set places for computing look angles in share/places.csv.
@@ -55,3 +62,4 @@ Written by Ray Patrick <ray@raypatrick.xyz> in 2020.
 .SH LICENSE
 GPLv3
 .SH SEE ALSO
+.B bc(1), curl(1), grep(1), sed(1)

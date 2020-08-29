@@ -13,11 +13,26 @@ function cuberoot
 {
   echo "e(l($1)/3)" | bc -l
 }
+
+# Main functions
 function settlefile
 {
   #workingdir=$(pwd)
   #tlefile=$workingdir/tle
   tlefile=/usr/local/share/tle/tle
+}
+
+function update
+{
+  # Maybe use $1 and $2 for usn/password and have another function to set those?
+  # That way the "autoupdate" function could just read usn/pwd from file instead
+  echo "Updating local spacetrack catalog."
+  read -p "Enter space-track.org username: " username
+  read -s -p "Enter space-track.org password: " password
+  query="https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-30/format/tle"
+  #query="https://www.space-track.org/basicspacedata/query/class/tle_latest/30/orderby/NORAD_CAT_ID/format/tle"
+  curl https://www.space-track.org/ajaxauth/login -c /usr/local/share/tle/cookies.txt -d "identity=$username&password=$password&query=$query" > /usr/local/share/tle/tle
+  exit 0
 }
 
 function readplaces
@@ -44,8 +59,8 @@ function getplace
 function showplace
 {
   echo "Place: $fullname"
-  echo "Latitude: $lat"
-  echo "Longitude: $lon"
+  echo "Latitude (N): $lat"
+  echo "Longitude (W): $lon"
   echo "Elevation (km): $elevation"
   echo "Left-hand azimuth extent (deg): $azleft"
   echo "Right-hand azimuth extent (deg): $azright"
@@ -169,7 +184,18 @@ function decodetle
 	  classification="SECRET"
   fi
   intdes=${line1:9:7}
+  if [ ${intdes:0:1} -ge "5" ]; then
+    intdes=19$intdes
+  else
+    intdes=20$intdes
+  fi
+  intdes=${intdes:0:4}-${intdes:4:100}
   epochyear=${line1:18:2}
+  if [ ${epochyear:0:1} -ge "5" ]; then
+    epochyear=19$epochyear
+  else
+    epochyear=20$epochyear
+  fi
   epochday=${line1:20:12}
   mmprime=${line1:33:11}
   mmdoubleprime=${line1:44:9}
@@ -209,21 +235,21 @@ function decodetle
   echo "Ephemeris type: $ephtype"
   echo "ELSET number: $elsetnumber"
   echo "Line 1 checksum: $checksum1"
-  echo "Inclination: $inclination"
-  echo "RAAN: $raan"
+  echo "Inclination (deg): $inclination"
+  echo "RAAN (deg): $raan"
   echo "Eccentricity: $eccentricity"
-  echo "Argument of perigee: $argofperigee"
-  echo "Mean anomaly: $meananomaly"
-  echo "Mean motion: $meanmotion"
-  echo "Period: $period minutes"
+  echo "Argument of perigee (deg): $argofperigee"
+  echo "Mean anomaly (deg): $meananomaly"
+  echo "Mean motion (rev/day): $meanmotion"
+  echo "Period (minutes): $period"
   echo "Rev number: $revnumber"
   echo "Line 2 checksum: $checksum2"
-  echo "Apogee: $apogee km"
-  echo "Perigee: $perigee km"
-  echo "Apogee altitude: $apogeealt km"
-  echo "Perigee altitude: $perigeealt km"
-  exit 1
-}
+  echo "Apogee (km): $apogee"
+  echo "Perigee (km): $perigee"
+  echo "Apogee altitude (km): $apogeealt"
+  echo "Perigee altitude (km): $perigeealt"
+
+  }
 
 #while getopts 'ht' flag
 #do
@@ -240,35 +266,38 @@ function decodetle
 #fi
 
 case "$1" in
-	sat) settlefile
+  sat) if [ -z "$2" ]; then echo "tle: not enough arguments."; exit 1; fi
+       settlefile
 	     getsatno $2 $tlefile ;;
- cron) echo "Set cron job y/n?" ;;
-decode) if [ -z "$2" ]; then echo "tle - not enough arguments."; exit 1; fi
+  cron) echo "Set cron job y/n?" ;;
+  decode) if [ -z "$2" ]; then echo "tle: not enough arguments."; exit 1; fi
        settlefile
 	     getsatno $2 $tlefile | decodetle ;;
-looks) settlefile
+  looks) if [ -z "$2" ]; then echo "tle: not enough arguments."; exit 1; fi
+       settlefile
 	     satno=$(printsatno $2 $tlefile)
 	     echo "Generating looks for "$satno"." ;;
- epochtime) settlefile
-      epochtime $2 $tlefile ;;
-	age) settlefile
+  epochtime) if [ -z "$2" ]; then echo "tle: not enough arguments."; exit 1; fi
+       settlefile
+       epochtime $2 $tlefile ;;
+	age) if [ -z "$2" ]; then echo "tle: not enough arguments."; exit 1; fi
+       settlefile
 	     epochtime $2 $tlefile | age ;;
-places) readplaces
-        if [ "$2" = "edit" ]; then
-          sudo $EDITOR $placefile 
-          echo "If you updated places.csv, running 'sudo make install'"
-          echo "from the tle repo directory will overwrite your changes!"
-          echo "Ensure you copy the file on your system to share/places.csv"
-          echo "in the tle repo directory if you don't want this to happen."
-        exit 0
-        fi
-        if [ -z "$2" ]; then
-          echo "tle - not enough arguments."
-          exit 1
-        fi
-        getplace $2
-        showplace ;;
-	  *) cat << EOF
+  places) readplaces
+       if [ "$2" = "edit" ]; then
+         sudo $EDITOR $placefile 
+         echo "If you updated places.csv, running 'sudo make install'"
+         echo "from the tle repo directory will overwrite your changes!"
+         echo "Ensure you copy the file on your system to share/places.csv"
+         echo "in the tle repo directory if you don't want this to happen."
+       exit 0
+       fi
+       if [ -z "$2" ]; then echo "tle: not enough arguments."; exit 1; fi
+       getplace $2
+       showplace ;;
+  update) update
+       exit 0 ;;
+	     *) cat << EOF
 tle - NORAD two-line element set processor. Written 2020 by Ray Patrick.
 
 Options:
@@ -299,6 +328,9 @@ Options:
   	$ tle looks [SATNO or INTDES] [PLACE]
        		Calculate look angles for a specific satellite.
                 (Coming soon)
+
+        $ tle update
+                Updates the TLE file at /usr/local/share/tle/tle.
 
 NOTE: Typing "man tle" at the command line will bring up more
 thorough instructions.	

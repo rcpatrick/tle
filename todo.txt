@@ -1,9 +1,0 @@
-tle - TO DO:
-1. Refactor to be POSIX-compliant (get rid of Bash-isms like [[]] in favor of
-case statements, etc.)
-2. Split finding each orbital element into its own function.
-3. Implement space-track.org API automation.
-4. Start on look angle command.
-  a. share/places.csv with lat/lon/az/el/range constraints?
-  b. 'tle places' should open places.csv with $EDITOR or load defaults
-  c. full command: 'tle looks 25544 cod|ble|cav|thl|fyl|mau|soc|...'
